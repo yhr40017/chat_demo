@@ -139,7 +139,8 @@ async def chat(
             return
 
         assistant_message = Message(
-            conversation_id=conversation_id, role="assistant", content=full_response
+            conversation_id=conversation_id, role="assistant", content=full_response,
+            references=rag_references if rag_references else None
         )
         db.add(assistant_message)
         await db.commit()

@@ -10,6 +10,7 @@ class MessageBase(BaseModel):
 class MessageResponse(MessageBase):
     id: int
     conversation_id: int
+    references: list[dict] | None = None
     created_at: datetime
 
     class Config:
