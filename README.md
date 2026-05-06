@@ -9,6 +9,7 @@ Ollama 로컬 LLM을 활용한 웹 기반 채팅 애플리케이션입니다.
 - **모델 선택** — Ollama에 설치된 모든 모델 조회 및 전환
 - **마크다운 렌더링** — 코드 블록(구문 강조 + 복사), 테이블, 리스트 등
 - **파일 첨부** — 문서를 업로드하면 내용을 컨텍스트로 활용하여 대화
+- **지식 저장소 (RAG)** — 문서를 글로벌 지식으로 등록, 이후 모든 대화에서 관련 내용 자동 참조
 - **자동 제목 생성** — 첫 대화 내용 기반 LLM 자동 요약, 더블클릭으로 수동 편집
 - **응답 중지** — 스트리밍 중 중지 버튼으로 응답 취소
 - **다크/라이트 테마** — 토글 버튼으로 전환
@@ -21,6 +22,7 @@ Ollama 로컬 LLM을 활용한 웹 기반 채팅 애플리케이션입니다.
 | Frontend | React, TypeScript, react-markdown, react-syntax-highlighter |
 | Database | MySQL 8.4 (Docker) |
 | LLM | Ollama (로컬 서빙) |
+| 검색/RAG | BM25 (rank_bm25) + TF-IDF (scikit-learn) 하이브리드 |
 | 통신 | REST API + SSE (Server-Sent Events) |
 
 ## 프로젝트 구조
@@ -34,14 +36,17 @@ chat-demo/
 │       ├── main.py                   # FastAPI 엔트리포인트, CORS, 라우터 등록
 │       ├── config.py                 # 환경설정 (pydantic-settings)
 │       ├── database.py               # SQLAlchemy async 엔진/세션
-│       ├── models.py                 # DB 모델 (Conversation, Message, Attachment)
+│       ├── models.py                 # DB 모델 (Conversation, Message, Attachment, KnowledgeDocument)
 │       ├── schemas.py                # Pydantic 스키마
 │       ├── file_parser.py            # 파일 텍스트 추출 (PDF, DOCX, HWP, HWPX, Excel 등)
+│       ├── chunker.py                # 텍스트 청크 분할 (단락 인식, 오버랩)
+│       ├── vector_store.py           # BM25+TF-IDF 하이브리드 검색 엔진
 │       └── routes/
 │           ├── conversations.py      # 대화방 CRUD
-│           ├── chat.py               # SSE 스트리밍 채팅, 자동 제목 생성
+│           ├── chat.py               # SSE 스트리밍 채팅, RAG 통합, 자동 제목 생성
 │           ├── models.py             # Ollama 모델 목록
-│           └── attachments.py        # 파일 업로드/조회/삭제
+│           ├── attachments.py        # 파일 업로드/조회/삭제
+│           └── knowledge.py          # 지식 저장소 문서 관리
 ├── frontend/
 │   ├── package.json
 │   └── src/
@@ -54,7 +59,8 @@ chat-demo/
 │           ├── ChatMessage.tsx       # 메시지 렌더링 (마크다운, 코드 복사)
 │           ├── ChatInput.tsx         # 입력창, 파일 첨부, 전송/중지 버튼
 │           ├── ModelSelector.tsx     # 모델 선택 드롭다운
-│           └── ThemeToggle.tsx       # 다크/라이트 토글
+│           ├── ThemeToggle.tsx       # 다크/라이트 토글
+│           └── KnowledgePanel.tsx    # 지식 저장소 관리 모달
 └── scripts/
     ├── start-backend.sh
     └── start-frontend.sh
@@ -143,6 +149,25 @@ npm install
 | GET | `/api/conversations/:id/attachments` | 첨부파일 목록 |
 | POST | `/api/conversations/:id/attachments` | 파일 업로드 |
 | DELETE | `/api/conversations/:id/attachments/:aid` | 첨부파일 삭제 |
+| GET | `/api/knowledge` | 지식 문서 목록 |
+| POST | `/api/knowledge/upload` | 지식 문서 업로드 |
+| GET | `/api/knowledge/:id/status` | 문서 처리 상태 조회 |
+| DELETE | `/api/knowledge/:id` | 지식 문서 삭제 |
+
+## 지식 저장소 (RAG)
+
+헤더의 **📚 지식 저장소** 버튼으로 문서를 글로벌 지식으로 등록할 수 있습니다.
+
+**동작 원리:**
+1. 문서 업로드 → 텍스트 추출 → 500자 단위 청크 분할 (50자 오버랩)
+2. 청크를 BM25 + TF-IDF 하이브리드 인덱스에 저장
+3. 사용자가 질문하면 BM25(0.5) + TF-IDF 코사인 유사도(0.5)로 관련 청크 검색
+4. 검색 결과를 시스템 프롬프트에 포함하여 LLM이 참조
+
+**특징:**
+- 별도 임베딩 모델 불필요 (BM25 + TF-IDF만 사용)
+- 업로드된 문서는 모든 대화에서 자동 참조
+- 백그라운드 비동기 처리 (대용량 문서도 UI 블로킹 없음)
 
 ## 환경변수
 
