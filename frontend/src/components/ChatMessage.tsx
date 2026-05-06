@@ -38,7 +38,11 @@ function CodeBlock({ language, children }: { language: string; children: string 
 export default function ChatMessage({ role, content, references }: Props) {
   return (
     <div className={`message ${role}`}>
-      <div className="message-avatar">{role === 'user' ? '👤' : '🤖'}</div>
+      <div className="message-avatar">
+        {role === 'user'
+          ? <img src="/send_icon.svg" alt="User" className="avatar-icon" />
+          : <img src="/ai_icon.svg" alt="AI" className="avatar-icon" />}
+      </div>
       <div className="message-content">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}

@@ -140,6 +140,9 @@ body {
 }
 
 .knowledge-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   background: none;
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -229,8 +232,21 @@ body {
 }
 
 .message-avatar {
-  font-size: 20px;
   flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+
+.avatar-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.btn-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
 }
 
 .message-content {

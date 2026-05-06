@@ -268,7 +268,7 @@ function App() {
           <ModelSelector models={models} selectedModel={selectedModel} onChange={handleModelChange} />
           <div className="header-actions">
             <button className="knowledge-btn" onClick={() => setKnowledgeOpen(true)} title="지식 저장소">
-              📚 지식 저장소
+              <img src="/document_icon.svg" alt="" className="btn-icon" /> 지식 저장소
             </button>
             <ThemeToggle dark={dark} onToggle={() => setDark(!dark)} />
           </div>
@@ -285,7 +285,9 @@ function App() {
           ))}
           {streaming && !streamingContent && thinkingContent && (
             <div className="message assistant">
-              <div className="message-avatar">🤖</div>
+              <div className="message-avatar">
+                <img src="/ai_icon.svg" alt="AI" className="avatar-icon" />
+              </div>
               <div className="message-content thinking-indicator">
                 <span className="thinking-label">생각 중...</span>
               </div>

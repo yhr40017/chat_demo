@@ -8,7 +8,7 @@ interface Props {
 export default function ThemeToggle({ dark, onToggle }: Props) {
   return (
     <button className="theme-toggle" onClick={onToggle} title="테마 전환">
-      {dark ? '☀️' : '🌙'}
+      <img src={dark ? '/light_mode_icon.svg' : '/dark_mode_icon.svg'} alt="테마" className="btn-icon" />
     </button>
   );
 }
