@@ -8,7 +8,7 @@ import httpx
 
 from app.database import get_db
 from app.config import settings
-from app.models import Conversation, Message, Attachment
+from app.models import Conversation, Message, Attachment, KnowledgeDocument
 from app.schemas import ChatRequest
 from app import vector_store
 
@@ -62,11 +62,24 @@ async def chat(
 
     # RAG: 지식 저장소에서 관련 문서 검색
     rag_context = ""
+    rag_references = []
     try:
         results = vector_store.search(query=data.message, n_results=5)
         if results:
             rag_parts = [r["content"] for r in results]
             rag_context = "\n\n---\n\n".join(rag_parts)
+            # 참조 문서 정보 수집
+            doc_ids = list(set(r["doc_id"] for r in results))
+            doc_result = await db.execute(
+                select(KnowledgeDocument).where(KnowledgeDocument.id.in_(doc_ids))
+            )
+            doc_map = {d.id: d.filename for d in doc_result.scalars().all()}
+            seen = set()
+            for r in results:
+                did = r["doc_id"]
+                if did not in seen and did in doc_map:
+                    seen.add(did)
+                    rag_references.append({"filename": doc_map[did], "score": round(r["score"], 3)})
     except Exception:
         pass
 
@@ -141,6 +154,9 @@ async def chat(
             )
             await db.commit()
 
-        yield f"data: {json.dumps({'done': True, 'title': title})}\n\n"
+        done_data = {'done': True, 'title': title}
+        if rag_references:
+            done_data['references'] = rag_references
+        yield f"data: {json.dumps(done_data)}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

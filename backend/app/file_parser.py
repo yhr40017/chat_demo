@@ -31,9 +31,12 @@ def _parse_pdf(content: bytes) -> str:
     reader = PdfReader(io.BytesIO(content))
     texts = []
     for page in reader.pages:
-        text = page.extract_text()
-        if text:
-            texts.append(text)
+        try:
+            text = page.extract_text()
+            if text:
+                texts.append(text)
+        except Exception:
+            continue
     return "\n".join(texts)
 
 

@@ -5,7 +5,7 @@ import ChatInput from './components/ChatInput';
 import ModelSelector from './components/ModelSelector';
 import ThemeToggle from './components/ThemeToggle';
 import KnowledgePanel from './components/KnowledgePanel';
-import { Conversation, Message, OllamaModel, Attachment } from './types';
+import { Conversation, Message, OllamaModel, Attachment, Reference } from './types';
 import {
   fetchConversations,
   createConversation,
@@ -212,7 +212,7 @@ function App() {
         if (activeConvIdRef.current !== convId) return;
         setStreamingContent((prev) => prev + token);
       },
-      (title) => {
+      (title, references) => {
         setStreamingContent((prev) => {
           if (prev) {
             const assistantMsg: Message = {
@@ -221,6 +221,7 @@ function App() {
               role: 'assistant',
               content: prev,
               created_at: new Date().toISOString(),
+              references,
             };
             setMessages((msgs) => [...msgs, assistantMsg]);
           }
@@ -280,7 +281,7 @@ function App() {
             </div>
           )}
           {messages.map((msg) => (
-            <ChatMessage key={msg.id} role={msg.role} content={msg.content} />
+            <ChatMessage key={msg.id} role={msg.role} content={msg.content} references={msg.references} />
           ))}
           {streaming && !streamingContent && thinkingContent && (
             <div className="message assistant">

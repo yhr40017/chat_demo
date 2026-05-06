@@ -91,11 +91,13 @@ export async function fetchKnowledgeDocStatus(id: number) {
   return res.json();
 }
 
+import { Reference } from './types';
+
 export function streamChat(
   conversationId: number,
   message: string,
   onToken: (token: string) => void,
-  onDone: (title?: string) => void,
+  onDone: (title?: string, references?: Reference[]) => void,
   onError: (err: string) => void,
   onThinking?: (token: string) => void,
 ) {
@@ -127,7 +129,7 @@ export function streamChat(
             const data = JSON.parse(line.slice(6));
             if (data.thinking && onThinking) onThinking(data.thinking);
             if (data.token) onToken(data.token);
-            if (data.done) onDone(data.title || undefined);
+            if (data.done) onDone(data.title || undefined, data.references || undefined);
             if (data.error) onError(data.error);
           } catch {}
         }

@@ -50,6 +50,8 @@ class HybridSearch:
             return
 
         tokenized = [_tokenize(c) for c in self.chunks]
+        # BM25Okapi requires non-empty token lists; filter out empty ones
+        tokenized = [t if t else [""] for t in tokenized]
         self.bm25 = BM25Okapi(tokenized)
 
         self.tfidf = TfidfVectorizer(tokenizer=_tokenize, token_pattern=None)

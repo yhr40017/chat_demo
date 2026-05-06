@@ -3,10 +3,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Reference } from '../types';
 
 interface Props {
   role: 'user' | 'assistant';
   content: string;
+  references?: Reference[];
 }
 
 function CodeBlock({ language, children }: { language: string; children: string }) {
@@ -33,7 +35,7 @@ function CodeBlock({ language, children }: { language: string; children: string 
   );
 }
 
-export default function ChatMessage({ role, content }: Props) {
+export default function ChatMessage({ role, content, references }: Props) {
   return (
     <div className={`message ${role}`}>
       <div className="message-avatar">{role === 'user' ? '👤' : '🤖'}</div>
@@ -57,6 +59,17 @@ export default function ChatMessage({ role, content }: Props) {
         >
           {content}
         </ReactMarkdown>
+        {references && references.length > 0 && (
+          <div className="references">
+            <span className="references-label">참조 문서</span>
+            {references.map((ref, idx) => (
+              <span key={idx} className="reference-chip">
+                {ref.filename}
+                <span className="reference-score">{Math.round(ref.score * 100)}%</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

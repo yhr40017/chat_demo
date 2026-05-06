@@ -38,4 +38,4 @@ def split_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
     if current_chunk.strip():
         chunks.append(current_chunk)
 
-    return chunks
+    return [c for c in chunks if c.strip()]

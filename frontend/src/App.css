@@ -278,6 +278,43 @@ body {
   font-size: 13px;
 }
 
+/* References */
+.references {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.references-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.reference-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.reference-score {
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Chat Input */
 .chat-input-wrapper {
   border-top: 1px solid var(--border);

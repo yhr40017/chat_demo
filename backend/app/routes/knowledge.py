@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
@@ -7,6 +8,8 @@ from app.models import KnowledgeDocument
 from app.file_parser import extract_text
 from app.chunker import split_text
 from app import vector_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
@@ -46,6 +49,7 @@ async def process_document(doc_id: int, filename: str, content: bytes):
             await db.commit()
 
         except Exception as e:
+            logger.exception("문서 처리 실패 (doc_id=%d, filename=%s)", doc_id, filename)
             await db.execute(
                 update(KnowledgeDocument)
                 .where(KnowledgeDocument.id == doc_id)
