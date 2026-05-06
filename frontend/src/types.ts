@@ -27,3 +27,13 @@ export interface Attachment {
   file_size: number;
   created_at: string;
 }
+
+export interface KnowledgeDoc {
+  id: number;
+  filename: string;
+  file_size: number;
+  chunk_count: number;
+  status: 'processing' | 'ready' | 'error';
+  error_message?: string;
+  created_at: string;
+}

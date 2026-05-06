@@ -62,6 +62,35 @@ export async function deleteAttachment(conversationId: number, attachmentId: num
   });
 }
 
+// Knowledge Base
+export async function fetchKnowledgeDocs() {
+  const res = await fetch(`${API_BASE}/knowledge`);
+  return res.json();
+}
+
+export async function uploadKnowledgeDoc(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/knowledge/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || '파일 업로드 실패');
+  }
+  return res.json();
+}
+
+export async function deleteKnowledgeDoc(id: number) {
+  await fetch(`${API_BASE}/knowledge/${id}`, { method: 'DELETE' });
+}
+
+export async function fetchKnowledgeDocStatus(id: number) {
+  const res = await fetch(`${API_BASE}/knowledge/${id}/status`);
+  return res.json();
+}
+
 export function streamChat(
   conversationId: number,
   message: string,

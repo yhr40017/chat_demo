@@ -10,6 +10,7 @@ from app.database import get_db
 from app.config import settings
 from app.models import Conversation, Message, Attachment
 from app.schemas import ChatRequest
+from app import vector_store
 
 router = APIRouter(prefix="/api/conversations", tags=["chat"])
 
@@ -58,15 +59,38 @@ async def chat(
     await db.commit()
 
     messages = []
+
+    # RAG: 지식 저장소에서 관련 문서 검색
+    rag_context = ""
+    try:
+        results = vector_store.search(query=data.message, n_results=5)
+        if results:
+            rag_parts = [r["content"] for r in results]
+            rag_context = "\n\n---\n\n".join(rag_parts)
+    except Exception:
+        pass
+
+    # 대화별 첨부파일 컨텍스트
+    attachment_context = ""
     if conv.attachments:
         context_parts = []
         for att in conv.attachments:
             context_parts.append(f"[첨부파일: {att.filename}]\n{att.content_text[:8000]}")
-        context = "\n\n".join(context_parts)
-        messages.append({
-            "role": "system",
-            "content": f"사용자가 첨부한 문서 내용입니다. 이 내용을 참고하여 답변하세요.\n\n{context}",
-        })
+        attachment_context = "\n\n".join(context_parts)
+
+    # 시스템 프롬프트 구성
+    system_parts = []
+    if rag_context:
+        system_parts.append(
+            "다음은 지식 저장소에서 검색된 관련 문서 내용입니다. "
+            "이 내용을 참고하여 답변하세요.\n\n" + rag_context
+        )
+    if attachment_context:
+        system_parts.append(
+            "다음은 사용자가 이 대화에 첨부한 문서 내용입니다.\n\n" + attachment_context
+        )
+    if system_parts:
+        messages.append({"role": "system", "content": "\n\n".join(system_parts)})
 
     for m in conv.messages:
         messages.append({"role": m.role, "content": m.content})

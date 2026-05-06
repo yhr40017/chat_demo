@@ -4,6 +4,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import ModelSelector from './components/ModelSelector';
 import ThemeToggle from './components/ThemeToggle';
+import KnowledgePanel from './components/KnowledgePanel';
 import { Conversation, Message, OllamaModel, Attachment } from './types';
 import {
   fetchConversations,
@@ -29,6 +30,7 @@ function App() {
   const [streamingContent, setStreamingContent] = useState('');
   const [thinkingContent, setThinkingContent] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [dark, setDark] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeConvIdRef = useRef<number | null>(null);
@@ -263,7 +265,12 @@ function App() {
       <main className="main">
         <header className="header">
           <ModelSelector models={models} selectedModel={selectedModel} onChange={handleModelChange} />
-          <ThemeToggle dark={dark} onToggle={() => setDark(!dark)} />
+          <div className="header-actions">
+            <button className="knowledge-btn" onClick={() => setKnowledgeOpen(true)} title="지식 저장소">
+              📚 지식 저장소
+            </button>
+            <ThemeToggle dark={dark} onToggle={() => setDark(!dark)} />
+          </div>
         </header>
         <div className="messages">
           {messages.length === 0 && !streaming && (
@@ -298,6 +305,7 @@ function App() {
           streaming={streaming}
         />
       </main>
+      <KnowledgePanel visible={knowledgeOpen} onClose={() => setKnowledgeOpen(false)} />
     </div>
   );
 }
