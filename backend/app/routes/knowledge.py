@@ -1,9 +1,11 @@
 import logging
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
 from app.database import get_db, async_session
+from app.config import settings
 from app.models import KnowledgeDocument
 from app.file_parser import extract_text
 from app.chunker import split_text
@@ -14,6 +16,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+
+
+async def generate_summary(text: str, filename: str) -> str:
+    preview = text[:4000]
+    prompt = (
+        "다음 문서의 내용을 분석하여 3~5문장으로 요약해주세요. "
+        "문서의 주제, 핵심 내용, 주요 키워드를 포함해주세요. "
+        "요약만 출력하고 다른 설명은 하지 마세요.\n\n"
+        f"[문서명: {filename}]\n\n"
+        f"{preview}"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                f"{settings.ollama_base_url}/api/generate",
+                json={"model": "gemma4:26b", "prompt": prompt, "stream": False},
+            )
+            data = resp.json()
+            summary = data.get("response", "").strip()
+            return summary[:2000] if summary else ""
+    except Exception as e:
+        logger.warning("요약 생성 실패 (filename=%s): %s", filename, e)
+        return ""
 
 
 async def process_document(doc_id: int, filename: str, content: bytes):
@@ -28,6 +53,8 @@ async def process_document(doc_id: int, filename: str, content: bytes):
                 )
                 await db.commit()
                 return
+
+            summary = await generate_summary(text, filename)
 
             chunks = split_text(text, chunk_size=500, overlap=50)
             if not chunks:
@@ -44,7 +71,7 @@ async def process_document(doc_id: int, filename: str, content: bytes):
             await db.execute(
                 update(KnowledgeDocument)
                 .where(KnowledgeDocument.id == doc_id)
-                .values(status="ready", chunk_count=len(chunks))
+                .values(status="ready", chunk_count=len(chunks), summary=summary or None)
             )
             await db.commit()
 
@@ -70,6 +97,7 @@ async def list_documents(db: AsyncSession = Depends(get_db)):
             "filename": d.filename,
             "file_size": d.file_size,
             "chunk_count": d.chunk_count,
+            "summary": d.summary,
             "status": d.status,
             "error_message": d.error_message,
             "created_at": d.created_at.isoformat() if d.created_at else None,
@@ -120,6 +148,7 @@ async def get_document_status(doc_id: int, db: AsyncSession = Depends(get_db)):
         "id": doc.id,
         "status": doc.status,
         "chunk_count": doc.chunk_count,
+        "summary": doc.summary,
         "error_message": doc.error_message,
     }
 

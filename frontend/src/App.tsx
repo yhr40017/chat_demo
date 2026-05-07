@@ -5,6 +5,7 @@ import ChatInput from './components/ChatInput';
 import ModelSelector from './components/ModelSelector';
 import ThemeToggle from './components/ThemeToggle';
 import KnowledgePanel from './components/KnowledgePanel';
+import SystemPromptEditor from './components/SystemPromptEditor';
 import { Conversation, Message, OllamaModel, Attachment, Reference } from './types';
 import {
   fetchConversations,
@@ -17,6 +18,8 @@ import {
   uploadAttachment,
   fetchAttachments,
   deleteAttachment,
+  exportConversation,
+  importConversation,
 } from './api';
 import './App.css';
 
@@ -31,6 +34,8 @@ function App() {
   const [thinkingContent, setThinkingContent] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [systemPromptOpen, setSystemPromptOpen] = useState(false);
+  const [currentSystemPrompt, setCurrentSystemPrompt] = useState('');
   const [dark, setDark] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeConvIdRef = useRef<number | null>(null);
@@ -95,6 +100,7 @@ function App() {
     if (activeConvIdRef.current === id) {
       setMessages(data.messages || []);
       setSelectedModel(data.model);
+      setCurrentSystemPrompt(data.system_prompt || '');
     }
   }, [streaming]);
 
@@ -107,6 +113,7 @@ function App() {
     setStreamingContent('');
     setThinkingContent('');
     setAttachments([]);
+    setCurrentSystemPrompt('');
   };
 
   const handleDeleteConversation = async (id: number) => {
@@ -117,6 +124,7 @@ function App() {
       setActiveConvId(null);
       setMessages([]);
       setAttachments([]);
+      setCurrentSystemPrompt('');
     }
   };
 
@@ -134,10 +142,45 @@ function App() {
     }
   };
 
+  const handleSystemPromptSave = async (prompt: string) => {
+    setCurrentSystemPrompt(prompt);
+    if (activeConvId) {
+      await updateConversation(activeConvId, { system_prompt: prompt || '' });
+    } else {
+      const conv = await createConversation('새 대화', selectedModel, prompt || null);
+      setConversations((prev) => [conv, ...prev]);
+      setActiveConvId(conv.id);
+      setMessages([]);
+      setAttachments([]);
+    }
+  };
+
+  const handleExport = async (id: number, format: 'json' | 'markdown') => {
+    try {
+      await exportConversation(id, format);
+    } catch {
+      alert('내보내기에 실패했습니다.');
+    }
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const conv = await importConversation(file);
+      setConversations((prev) => [conv, ...prev]);
+      setActiveConvId(conv.id);
+      const data = await fetchConversation(conv.id);
+      setMessages(data.messages || []);
+      setSelectedModel(data.model);
+      setCurrentSystemPrompt(data.system_prompt || '');
+    } catch (err: any) {
+      alert(`가져오기 실패: ${err.message}`);
+    }
+  };
+
   const handleFileUpload = async (file: File) => {
     let convId: number;
     if (!activeConvId) {
-      const conv = await createConversation('새 대화', selectedModel);
+      const conv = await createConversation('새 대화', selectedModel, currentSystemPrompt || null);
       setConversations((prev) => [conv, ...prev]);
       setActiveConvId(conv.id);
       setMessages([]);
@@ -179,7 +222,7 @@ function App() {
 
   const handleSend = async (message: string) => {
     if (!activeConvId) {
-      const conv = await createConversation('새 대화', selectedModel);
+      const conv = await createConversation('새 대화', selectedModel, currentSystemPrompt || null);
       setConversations((prev) => [conv, ...prev]);
       setActiveConvId(conv.id);
       setMessages([]);
@@ -262,11 +305,21 @@ function App() {
         onCreate={handleCreateConversation}
         onDelete={handleDeleteConversation}
         onRename={handleRenameConversation}
+        onExport={handleExport}
+        onImport={handleImport}
       />
       <main className="main">
         <header className="header">
           <ModelSelector models={models} selectedModel={selectedModel} onChange={handleModelChange} />
           <div className="header-actions">
+            <button
+              className={`system-prompt-btn ${currentSystemPrompt ? 'has-prompt' : ''}`}
+              onClick={() => setSystemPromptOpen(true)}
+              title="시스템 프롬프트"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              {currentSystemPrompt ? '프롬프트 설정됨' : '시스템 프롬프트'}
+            </button>
             <button className="knowledge-btn" onClick={() => setKnowledgeOpen(true)} title="지식 저장소">
               <img src="/document_icon.svg" alt="" className="btn-icon" /> 지식 저장소
             </button>
@@ -309,6 +362,12 @@ function App() {
         />
       </main>
       <KnowledgePanel visible={knowledgeOpen} onClose={() => setKnowledgeOpen(false)} />
+      <SystemPromptEditor
+        visible={systemPromptOpen}
+        systemPrompt={currentSystemPrompt}
+        onSave={handleSystemPromptSave}
+        onClose={() => setSystemPromptOpen(false)}
+      />
     </div>
   );
 }

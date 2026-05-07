@@ -16,6 +16,7 @@ export interface Conversation {
   id: number;
   title: string;
   model: string;
+  system_prompt?: string | null;
   created_at: string;
   updated_at: string;
   messages?: Message[];
@@ -39,7 +40,17 @@ export interface KnowledgeDoc {
   filename: string;
   file_size: number;
   chunk_count: number;
+  summary?: string | null;
   status: 'processing' | 'ready' | 'error';
   error_message?: string;
+  created_at: string;
+}
+
+export interface SearchResult {
+  conversation_id: number;
+  conversation_title: string;
+  message_id: number;
+  role: string;
+  content_snippet: string;
   created_at: string;
 }

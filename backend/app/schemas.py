@@ -20,17 +20,20 @@ class MessageResponse(MessageBase):
 class ConversationCreate(BaseModel):
     title: str = "새 대화"
     model: str = "gemma4:26b"
+    system_prompt: str | None = None
 
 
 class ConversationUpdate(BaseModel):
     title: str | None = None
     model: str | None = None
+    system_prompt: str | None = None
 
 
 class ConversationResponse(BaseModel):
     id: int
     title: str
     model: str
+    system_prompt: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -50,3 +53,30 @@ class ModelResponse(BaseModel):
     name: str
     size: int
     modified_at: str
+
+
+class SearchResult(BaseModel):
+    conversation_id: int
+    conversation_title: str
+    message_id: int
+    role: str
+    content_snippet: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationExport(BaseModel):
+    title: str
+    model: str
+    system_prompt: str | None = None
+    created_at: str
+    messages: list[dict]
+
+
+class ConversationImport(BaseModel):
+    title: str
+    model: str = "gemma4:26b"
+    system_prompt: str | None = None
+    messages: list[MessageBase] = []

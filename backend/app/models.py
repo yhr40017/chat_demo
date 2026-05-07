@@ -12,6 +12,7 @@ class Conversation(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(255), default="새 대화")
     model: Mapped[str] = mapped_column(String(100), default="gemma4:26b")
+    system_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -58,6 +59,7 @@ class KnowledgeDocument(Base):
     filename: Mapped[str] = mapped_column(String(255))
     file_size: Mapped[int] = mapped_column(default=0)
     chunk_count: Mapped[int] = mapped_column(default=0)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="processing")  # processing, ready, error
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

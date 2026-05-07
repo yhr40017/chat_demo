@@ -35,6 +35,33 @@ async def generate_title(model: str, user_message: str, assistant_response: str)
         return user_message[:50]
 
 
+def _compute_summary_similarity(query: str, summaries: list[dict]) -> list[dict]:
+    """질문과 문서 요약 간 TF-IDF 코사인 유사도를 계산하여 점수순 정렬 반환"""
+    if not summaries:
+        return []
+
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    import re
+
+    def tokenize(text: str) -> list[str]:
+        return re.findall(r"[\w]+", text.lower())
+
+    texts = [s["summary"] for s in summaries]
+    all_texts = texts + [query]
+    tfidf = TfidfVectorizer(tokenizer=tokenize, token_pattern=None)
+    tfidf_matrix = tfidf.fit_transform(all_texts)
+    query_vec = tfidf_matrix[-1]
+    doc_matrix = tfidf_matrix[:-1]
+    scores = cosine_similarity(query_vec, doc_matrix).flatten()
+
+    scored = []
+    for i, s in enumerate(summaries):
+        scored.append({**s, "similarity": float(scores[i])})
+    scored.sort(key=lambda x: x["similarity"], reverse=True)
+    return scored
+
+
 @router.post("/{conversation_id}/chat")
 async def chat(
     conversation_id: int,
@@ -60,26 +87,75 @@ async def chat(
 
     messages = []
 
-    # RAG: 지식 저장소에서 관련 문서 검색
+    # RAG: 문서 요약 기반 우선 검색 + 청크 검색
     rag_context = ""
     rag_references = []
     try:
-        results = vector_store.search(query=data.message, n_results=5)
-        if results:
-            rag_parts = [r["content"] for r in results]
-            rag_context = "\n\n---\n\n".join(rag_parts)
-            # 참조 문서 정보 수집
-            doc_ids = list(set(r["doc_id"] for r in results))
-            doc_result = await db.execute(
-                select(KnowledgeDocument).where(KnowledgeDocument.id.in_(doc_ids))
+        # 1단계: 모든 지식 문서의 요약을 로드하여 질문과 유사도 비교
+        doc_result = await db.execute(
+            select(KnowledgeDocument).where(
+                KnowledgeDocument.status == "ready",
+                KnowledgeDocument.summary.isnot(None),
             )
-            doc_map = {d.id: d.filename for d in doc_result.scalars().all()}
+        )
+        docs_with_summary = doc_result.scalars().all()
+
+        priority_doc_ids = set()
+        if docs_with_summary:
+            summaries = [
+                {"doc_id": d.id, "filename": d.filename, "summary": d.summary}
+                for d in docs_with_summary
+            ]
+            scored = _compute_summary_similarity(data.message, summaries)
+            # 유사도 0.01 이상인 문서를 우선 문서로 선정
+            priority_doc_ids = {s["doc_id"] for s in scored if s["similarity"] >= 0.01}
+
+        # 2단계: 청크 검색 (기존 하이브리드 검색)
+        all_results = vector_store.search(query=data.message, n_results=10)
+
+        if all_results and priority_doc_ids:
+            # 우선 문서의 청크를 앞에, 나머지를 뒤에 배치
+            priority_results = [r for r in all_results if r["doc_id"] in priority_doc_ids]
+            other_results = [r for r in all_results if r["doc_id"] not in priority_doc_ids]
+            results = (priority_results + other_results)[:7]
+        else:
+            results = all_results[:5]
+
+        if results:
+            # 우선 문서에는 요약도 함께 컨텍스트에 추가
+            summary_context_parts = []
+            if priority_doc_ids:
+                summary_map = {d.id: d for d in docs_with_summary}
+                added_summaries = set()
+                for r in results:
+                    did = r["doc_id"]
+                    if did in priority_doc_ids and did not in added_summaries and did in summary_map:
+                        doc = summary_map[did]
+                        summary_context_parts.append(
+                            f"[문서 '{doc.filename}' 요약]\n{doc.summary}"
+                        )
+                        added_summaries.add(did)
+
+            chunk_parts = [r["content"] for r in results]
+            rag_context = "\n\n---\n\n".join(summary_context_parts + chunk_parts)
+
+            # 참조 문서 정보 수집
+            all_doc_ids = list(set(r["doc_id"] for r in results))
+            doc_name_result = await db.execute(
+                select(KnowledgeDocument).where(KnowledgeDocument.id.in_(all_doc_ids))
+            )
+            doc_map = {d.id: d.filename for d in doc_name_result.scalars().all()}
             seen = set()
             for r in results:
                 did = r["doc_id"]
                 if did not in seen and did in doc_map:
                     seen.add(did)
-                    rag_references.append({"filename": doc_map[did], "score": round(r["score"], 3)})
+                    is_priority = did in priority_doc_ids
+                    rag_references.append({
+                        "filename": doc_map[did],
+                        "score": round(r["score"], 3),
+                        "matched_summary": is_priority,
+                    })
     except Exception:
         pass
 
@@ -93,10 +169,12 @@ async def chat(
 
     # 시스템 프롬프트 구성
     system_parts = []
+    if conv.system_prompt:
+        system_parts.append(conv.system_prompt)
     if rag_context:
         system_parts.append(
             "다음은 지식 저장소에서 검색된 관련 문서 내용입니다. "
-            "이 내용을 참고하여 답변하세요.\n\n" + rag_context
+            "문서 요약이 포함된 경우 해당 문서의 내용을 특히 우선적으로 참고하여 답변하세요.\n\n" + rag_context
         )
     if attachment_context:
         system_parts.append(

@@ -10,6 +10,7 @@ interface Props {
 export default function KnowledgePanel({ visible, onClose }: Props) {
   const [docs, setDocs] = useState<KnowledgeDoc[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -112,19 +113,38 @@ export default function KnowledgePanel({ visible, onClose }: Props) {
             <p className="knowledge-empty">등록된 문서가 없습니다.</p>
           )}
           {docs.map((doc) => (
-            <div key={doc.id} className="knowledge-item">
-              <div className="knowledge-item-info">
-                <span className="knowledge-item-name">{doc.filename}</span>
-                <span className="knowledge-item-meta">
-                  {formatSize(doc.file_size)} · {statusLabel(doc)}
-                </span>
+            <div key={doc.id} className="knowledge-item-wrapper">
+              <div className="knowledge-item">
+                <div
+                  className="knowledge-item-info"
+                  onClick={() => setExpandedId(expandedId === doc.id ? null : doc.id)}
+                  style={{ cursor: doc.summary ? 'pointer' : 'default' }}
+                >
+                  <span className="knowledge-item-name">
+                    {doc.summary && (
+                      <span className="knowledge-expand-icon">
+                        {expandedId === doc.id ? '▾' : '▸'}
+                      </span>
+                    )}
+                    {doc.filename}
+                  </span>
+                  <span className="knowledge-item-meta">
+                    {formatSize(doc.file_size)} · {statusLabel(doc)}
+                    {doc.summary && ' · 요약 있음'}
+                  </span>
+                </div>
+                <button
+                  className="knowledge-item-delete"
+                  onClick={() => handleDelete(doc.id)}
+                >
+                  삭제
+                </button>
               </div>
-              <button
-                className="knowledge-item-delete"
-                onClick={() => handleDelete(doc.id)}
-              >
-                삭제
-              </button>
+              {expandedId === doc.id && doc.summary && (
+                <div className="knowledge-summary">
+                  {doc.summary}
+                </div>
+              )}
             </div>
           ))}
         </div>

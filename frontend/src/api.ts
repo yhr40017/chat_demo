@@ -1,3 +1,5 @@
+import { Reference, SearchResult } from './types';
+
 const API_BASE = 'http://localhost:8000/api';
 
 export async function fetchConversations() {
@@ -5,11 +7,11 @@ export async function fetchConversations() {
   return res.json();
 }
 
-export async function createConversation(title: string, model: string) {
+export async function createConversation(title: string, model: string, system_prompt?: string | null) {
   const res = await fetch(`${API_BASE}/conversations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, model }),
+    body: JSON.stringify({ title, model, system_prompt: system_prompt || null }),
   });
   return res.json();
 }
@@ -19,7 +21,7 @@ export async function fetchConversation(id: number) {
   return res.json();
 }
 
-export async function updateConversation(id: number, data: { title?: string; model?: string }) {
+export async function updateConversation(id: number, data: { title?: string; model?: string; system_prompt?: string | null }) {
   const res = await fetch(`${API_BASE}/conversations/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -91,7 +93,48 @@ export async function fetchKnowledgeDocStatus(id: number) {
   return res.json();
 }
 
-import { Reference } from './types';
+// Search
+export async function searchConversations(query: string): Promise<SearchResult[]> {
+  const res = await fetch(`${API_BASE}/conversations/search?q=${encodeURIComponent(query)}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+// Export
+export async function exportConversation(id: number, format: 'json' | 'markdown' = 'json') {
+  const res = await fetch(`${API_BASE}/conversations/${id}/export?format=${format}`);
+  if (!res.ok) throw new Error('내보내기 실패');
+  const blob = await res.blob();
+  const ext = format === 'json' ? 'json' : 'md';
+  const contentDisposition = res.headers.get('Content-Disposition');
+  let filename = `conversation.${ext}`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?(.+)/);
+    if (match) filename = decodeURIComponent(match[1]);
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Import
+export async function importConversation(file: File) {
+  const text = await file.text();
+  const data = JSON.parse(text);
+  const res = await fetch(`${API_BASE}/conversations/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || '가져오기 실패');
+  }
+  return res.json();
+}
 
 export function streamChat(
   conversationId: number,
