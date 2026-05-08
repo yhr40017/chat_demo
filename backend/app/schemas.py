@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class MessageBase(BaseModel):
@@ -47,6 +47,14 @@ class ConversationDetailResponse(ConversationResponse):
 
 class ChatRequest(BaseModel):
     message: str
+
+    @field_validator("message")
+    @classmethod
+    def message_must_not_be_blank(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("메시지가 비어있습니다")
+        return stripped
 
 
 class ModelResponse(BaseModel):

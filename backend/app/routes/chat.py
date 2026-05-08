@@ -11,6 +11,7 @@ from app.config import settings
 from app.models import Conversation, Message, Attachment, KnowledgeDocument
 from app.schemas import ChatRequest
 from app import vector_store
+from app.tokenizer import tokenize as _tokenize
 
 router = APIRouter(prefix="/api/conversations", tags=["chat"])
 
@@ -42,14 +43,10 @@ def _compute_summary_similarity(query: str, summaries: list[dict]) -> list[dict]
 
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
-    import re
-
-    def tokenize(text: str) -> list[str]:
-        return re.findall(r"[\w]+", text.lower())
 
     texts = [s["summary"] for s in summaries]
     all_texts = texts + [query]
-    tfidf = TfidfVectorizer(tokenizer=tokenize, token_pattern=None)
+    tfidf = TfidfVectorizer(tokenizer=_tokenize, token_pattern=None)
     tfidf_matrix = tfidf.fit_transform(all_texts)
     query_vec = tfidf_matrix[-1]
     doc_matrix = tfidf_matrix[:-1]
@@ -216,12 +213,13 @@ async def chat(
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
 
-        assistant_message = Message(
-            conversation_id=conversation_id, role="assistant", content=full_response,
-            references=rag_references if rag_references else None
-        )
-        db.add(assistant_message)
-        await db.commit()
+        if full_response.strip():
+            assistant_message = Message(
+                conversation_id=conversation_id, role="assistant", content=full_response,
+                references=rag_references if rag_references else None
+            )
+            db.add(assistant_message)
+            await db.commit()
 
         title = None
         if is_first_message and full_response:

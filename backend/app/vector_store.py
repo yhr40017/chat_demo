@@ -1,4 +1,3 @@
-import re
 import pickle
 from pathlib import Path
 from typing import Optional
@@ -8,12 +7,12 @@ from rank_bm25 import BM25Okapi
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from app.tokenizer import tokenize as _tokenize
+
 DATA_DIR = Path(__file__).parent.parent / "knowledge_data"
 DATA_DIR.mkdir(exist_ok=True)
 
-
-def _tokenize(text: str) -> list[str]:
-    return re.findall(r"[\w]+", text.lower())
+INDEX_VERSION = 2
 
 
 class HybridSearch:
@@ -29,6 +28,7 @@ class HybridSearch:
         data = {
             "chunks": self.chunks,
             "doc_ids": self.doc_ids,
+            "version": INDEX_VERSION,
         }
         with open(DATA_DIR / "index.pkl", "wb") as f:
             pickle.dump(data, f)
@@ -41,6 +41,8 @@ class HybridSearch:
             self.chunks = data["chunks"]
             self.doc_ids = data["doc_ids"]
             self._rebuild_index()
+            if data.get("version", 1) != INDEX_VERSION:
+                self._save()
 
     def _rebuild_index(self):
         if not self.chunks:
@@ -72,7 +74,7 @@ class HybridSearch:
         # BM25 scores
         bm25_scores = self.bm25.get_scores(tokenized_query)
         bm25_max = bm25_scores.max() if bm25_scores.max() > 0 else 1
-        bm25_norm = bm25_scores / bm25_max
+        bm25_norm = np.clip(bm25_scores / bm25_max, 0, None)
 
         # TF-IDF cosine similarity
         query_vec = self.tfidf.transform([query])

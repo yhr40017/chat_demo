@@ -1,3 +1,13 @@
+import re
+
+_SENTENCE_RE = re.compile(r"(?<=[.!?。])\s+")
+
+
+def _split_sentences(text: str) -> list[str]:
+    parts = _SENTENCE_RE.split(text)
+    return [p for p in parts if p.strip()]
+
+
 def split_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
     if not text.strip():
         return []
@@ -16,16 +26,27 @@ def split_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
         else:
             if current_chunk:
                 chunks.append(current_chunk)
-            # If a single paragraph exceeds chunk_size, split it further
             if len(para) > chunk_size:
-                words = para
-                while len(words) > chunk_size:
-                    split_point = words[:chunk_size].rfind(" ")
-                    if split_point == -1:
-                        split_point = chunk_size
-                    chunks.append(words[:split_point])
-                    words = words[max(0, split_point - overlap):]
-                current_chunk = words
+                sentences = _split_sentences(para)
+                if len(sentences) > 1:
+                    buf = ""
+                    for sent in sentences:
+                        if len(buf) + len(sent) + 1 <= chunk_size:
+                            buf += (" " + sent) if buf else sent
+                        else:
+                            if buf:
+                                chunks.append(buf)
+                            buf = sent
+                    current_chunk = buf if buf else ""
+                else:
+                    words = para
+                    while len(words) > chunk_size:
+                        split_point = words[:chunk_size].rfind(" ")
+                        if split_point == -1:
+                            split_point = chunk_size
+                        chunks.append(words[:split_point])
+                        words = words[max(0, split_point - overlap):]
+                    current_chunk = words
             else:
                 # Start new chunk with overlap from previous
                 if chunks:
